@@ -9,7 +9,7 @@
 // @include     http://www.furaffinity.net/scraps/*
 // @include     http://www.furaffinity.net/gallery/*
 // @run-at      document-end
-// @version     1.3.4
+// @version     1.3.5
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -90,9 +90,17 @@ function getSubmissions() {
 
 //retrieves the submission image url from the submission page document.
 function getSubmissionSource(page){
-    var pageHtml = page.documentElement.innerHTML;
-    var regExDownloadLink = new RegExp('<a href="(.*/art/.*/(?:stories/|poetry/)?.*/.*)">Download</a>');
-    return 'http:' + pageHtml.match(regExDownloadLink) [1];
+    var source = null;
+    var downloadButton = page.getElementsByClassName("download-logged-in")[0];
+    if (downloadButton) { //beta
+        source = downloadButton.href;
+    } else { //clasic
+        var pageHtml = page.documentElement.innerHTML;
+        var regExDownloadLink = new RegExp('<a href="(.*/art/.*/(?:stories/|poetry/)?.*/.*)">Download</a>');
+        source = 'http:' + pageHtml.match(regExDownloadLink) [1];
+    }
+    return source;
+
 }
 
 function getTagsFromSubmission(page) {
@@ -102,7 +110,7 @@ function getTagsFromSubmission(page) {
         tags[i] = tagEl[i].firstChild.textContent;
     }
     //also collect category, species, and gender info
-    var categoryTagEl = page.getElementsByClassName("tags-row")[0].firstElementChild;
+    var categoryTagEl = page.querySelector(".sidebar-section:nth-child(4)"); //ugh, no unique selectors
     var categoryTagsList = categoryTagEl.getElementsByTagName("strong");
     var category = [];
     for (i = 0; i < categoryTagsList.length; i++) {
@@ -444,7 +452,7 @@ function downloadMenu() {
 }
 
 function insertButton() {
-    var insertAt = document.getElementsByClassName("userpage-tabs")[0] || document.getElementsByClassName('page-options') [0];
+    var insertAt = document.getElementsByClassName("userpage-tabs")[0] || document.getElementsByClassName('tab') [0];
 
     var button = document.createElement("input");
     button.type = "button";
