@@ -9,7 +9,7 @@
 // @include     http://www.furaffinity.net/scraps/*
 // @include     http://www.furaffinity.net/gallery/*
 // @run-at      document-end
-// @version     1.3.5
+// @version     1.3.6
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -110,7 +110,7 @@ function getTagsFromSubmission(page) {
         tags[i] = tagEl[i].firstChild.textContent;
     }
     //also collect category, species, and gender info
-    var categoryTagEl = page.querySelector(".sidebar-section:nth-child(4)"); //ugh, no unique selectors
+    var categoryTagEl = page.getElementsByClassName("sidebar-section-no-bottom")[0]; //if this changes again... (ノಠ益ಠ)ノ彡┻━┻
     var categoryTagsList = categoryTagEl.getElementsByTagName("strong");
     var category = [];
     for (i = 0; i < categoryTagsList.length; i++) {
@@ -171,7 +171,7 @@ function fetchPage(submissions, num, collector) {
                         tags : tags[0],
                         category : tags[1],
                         artist : source.match(/art\/([^\/]+)\//)[1],
-                        description : page.getElementsByClassName("p20")[0].textContent,
+                        description : page.getElementsByClassName("submission-description")[0].textContent,
                         title : page.getElementsByClassName("submission-title")[0].firstChild.textContent,
                     };
                     log(fileName);
