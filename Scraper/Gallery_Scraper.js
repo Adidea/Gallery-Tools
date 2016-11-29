@@ -9,7 +9,7 @@
 // @include     http://www.furaffinity.net/scraps/*
 // @include     http://www.furaffinity.net/gallery/*
 // @run-at      document-end
-// @version     1.3.6
+// @version     1.3.7
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -165,13 +165,14 @@ function fetchPage(submissions, num, collector) {
                 if (downloadMetadata === true) {
                     var tags = getTagsFromSubmission(page);
                     var fileName = decodeURIComponent(source.match(/[^\/]+$/)[0]);
+                    var description = page.getElementsByClassName("submission-description")[0];
                     source = {
                         image : decodeURIComponent(source),
                         submission : submissions[num], //could provide id or url. using url for now.
                         tags : tags[0],
                         category : tags[1],
                         artist : source.match(/art\/([^\/]+)\//)[1],
-                        description : page.getElementsByClassName("submission-description")[0].textContent,
+                        description : description ? description.textContent : "",
                         title : page.getElementsByClassName("submission-title")[0].firstChild.textContent,
                     };
                     log(fileName);
