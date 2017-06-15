@@ -165,7 +165,7 @@ function fetchPage(submissions, num, collector) {
                 if (downloadMetadata === true) {
                     var tags = getTagsFromSubmission(page);
                     var fileName = decodeURIComponent(source.match(/[^\/]+$/)[0]);
-                    var description = page.getElementsByClassName("submission-description")[0];
+                    var description = page.getElementsByClassName("submission-description")[0]
                     source = {
                         image : decodeURIComponent(source),
                         submission : submissions[num], //could provide id or url. using url for now.
@@ -453,7 +453,7 @@ function downloadMenu() {
 }
 
 function insertButton() {
-    var insertAt = document.getElementsByClassName("userpage-tabs")[0] || document.getElementsByClassName('tab') [0];
+    var insertAt = document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab') [0];
 
     var button = document.createElement("input");
     button.type = "button";
