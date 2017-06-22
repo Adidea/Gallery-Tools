@@ -17,7 +17,7 @@ function findArtistsNotWatched(file, callback) {
 		var text = e.target.fileInput.result;
 		var submissions = JSON.parse(text);
 		for (s in submissions) {
-			var artist = submissions[s].artist];
+			var artist = submissions[s].artist;
 			if (!watching[artist]) {
 				notWatching[artist] = true;
 			}
