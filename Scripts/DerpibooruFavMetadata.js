@@ -53,7 +53,7 @@ function parseImageData(images) {
 		var tags = image.tags.split(', ');
 		metadata[image.id + getFileExt(image.image)] = {
 			image : image.image,
-			tags : image.tags,
+			tags : tags,
 			artist : artist ? artist[1] : "",
 			description : image.description
 		};
@@ -76,8 +76,7 @@ function insertButton() {
 	button.addEventListener("click", function() {
 		getAllFavorites(function (images) {
 			var metadata = parseImageData(images);
-			document.write(JSON.stringify(metadata, null, 4)); //lazy
-            //May output into specialized element and offer more feedback. Not particularly important as it is.
+			document.write(JSON.stringify(metadata, null, 4));
 		});
 	});
 }
