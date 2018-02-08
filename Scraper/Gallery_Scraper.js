@@ -9,7 +9,7 @@
 // @include     http://www.furaffinity.net/scraps/*
 // @include     http://www.furaffinity.net/gallery/*
 // @run-at      document-end
-// @version     1.3.7
+// @version     1.3.9
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -25,7 +25,7 @@ var sources = null;
 var submissions = [];
 var failed = [];
 var debugEnabled = false;
-var downloadPages = [1,1]; //ex:1,5 pages 1-5.
+var downloadPages = [1, 1]; //ex:1,5 pages 1-5.
 var pageNum = downloadPages[0]; //current page downloading
 var submissionsComplete = 0; //number submissions downloaded.
 var currentPage; //gallery document being scraped
@@ -40,7 +40,7 @@ function resetGlobals() {
     sources = null;
     submissions = [];
     failed = [];
-    downloadPages = [1,1]; //ex:1,5 pages 1-5.
+    downloadPages = [1, 1]; //ex:1,5 pages 1-5.
     pageNum = downloadPages[0]; //current page downloading
     submissionsComplete = 0; //number submissions downloaded.
     currentPage = undefined; //gallery document being scraped
@@ -64,10 +64,12 @@ function setStatus(str) {
         log("attempt to set status without statusText");
     }
 }
+
 function setProgress(percent) {
     var statsFill = masterDiv.querySelector("#statusFill");
-    statusFill.style.width = (100*percent)+"%";
+    statusFill.style.width = (100 * percent) + "%";
 }
+
 function writeToOutput(source, json) {
     var output = masterDiv.querySelector("#output");
     if (json) {
@@ -80,16 +82,16 @@ function writeToOutput(source, json) {
 //Gets all submissions displayed on currentPage and returns array of urls.
 function getSubmissions() {
     var pageHtml = currentPage.documentElement.innerHTML;
-    var regExDownloadLink = new RegExp('<a href="(\/view\/(.+?)\/)">','g');
+    var regExDownloadLink = new RegExp('<a href="(\/view\/(.+?)\/)">', 'g');
     var submissionLinks;
     while ((submissionLinks = regExDownloadLink.exec(pageHtml)) !== null) {
-        submissions[(submissions.length-1) + 1] = submissionLinks[1]; //page.href;
+        submissions[(submissions.length - 1) + 1] = submissionLinks[1]; //page.href;
     }
     return submissions;
 }
 
 //retrieves the submission image url from the submission page document.
-function getSubmissionSource(page){
+function getSubmissionSource(page) {
     var source = null;
     var downloadButton = page.getElementsByClassName("download-logged-in")[0];
     if (downloadButton) { //beta
@@ -97,7 +99,7 @@ function getSubmissionSource(page){
     } else { //clasic
         var pageHtml = page.documentElement.innerHTML;
         var regExDownloadLink = new RegExp('<a href="(.*/art/.*/(?:stories/|poetry/)?.*/.*)">Download</a>');
-        source = 'http:' + pageHtml.match(regExDownloadLink) [1];
+        source = 'http:' + pageHtml.match(regExDownloadLink)[1];
     }
     return source;
 
@@ -119,7 +121,7 @@ function getTagsFromSubmission(page) {
         category[i] = categoryTitle + categoryTag.replace("|", "");
     }
     //get rating
-    var rating = "Rating: " + page.getElementsByClassName("rating-box")[0].textContent.replace("\n","");
+    var rating = "Rating: " + page.getElementsByClassName("rating-box")[0].textContent.replace("\n", "");
     category.push(rating);
     return [tags, category];
 }
@@ -165,15 +167,16 @@ function fetchPage(submissions, num, collector) {
                 if (downloadMetadata === true) {
                     var tags = getTagsFromSubmission(page);
                     var fileName = decodeURIComponent(source.match(/[^\/]+$/)[0]);
-                    var description = page.getElementsByClassName("submission-description")[0]
+                    var title = page.getElementsByClassName("submission-title")[0];
+                    var description = title.nextSibling.textContent;
                     source = {
-                        image : decodeURIComponent(source),
-                        submission : submissions[num], //could provide id or url. using url for now.
-                        tags : tags[0],
-                        category : tags[1],
-                        artist : source.match(/art\/([^\/]+)\//)[1],
-                        description : description ? description.textContent : "",
-                        title : page.getElementsByClassName("submission-title")[0].firstChild.textContent,
+                        image: decodeURIComponent(source),
+                        submission: submissions[num], //could provide id or url. using url for now.
+                        tags: tags[0],
+                        category: tags[1],
+                        artist: source.match(/art\/([^\/]+)\//)[1],
+                        description: description ? description : "",
+                        title: title.getElementsByClassName("submission-title-header")[0].innerText
                     };
                     log(fileName);
                     collector[fileName] = source;
@@ -182,7 +185,7 @@ function fetchPage(submissions, num, collector) {
                     //submissionsComplete = submissionsComplete + 1;
                 }
                 setStatus("Getting Submission Source:" + num + "/" + submissions.length);
-                setProgress(num/submissions.length);
+                setProgress(num / submissions.length);
 
                 var end = false;
                 if (num < submissions.length) {
@@ -197,7 +200,7 @@ function fetchPage(submissions, num, collector) {
                 }
             } else { //bad request, add to fail list D:
                 setStatus("Request Failed: " + submissions[num]);
-                failed[(failed.length-1)+1] = submissions[num];
+                failed[(failed.length - 1) + 1] = submissions[num];
                 if (num < submissions.length) { //ugly patch
                     fetchPage(submissions, ++num, collector);
                 }
@@ -242,7 +245,7 @@ function getGallerySubmissions() {
         }
         setStatus("Scraping page: " + pageNum + "/" + (downloadAll ? "?" : downloadPages[1]));
         if (downloadAll === false) {
-            setProgress(pageNum/downloadPages[1]);
+            setProgress(pageNum / downloadPages[1]);
         }
         var xhr = new XMLHttpRequest();
         xhr.addEventListener("loadend", function() {
@@ -259,7 +262,7 @@ function getGallerySubmissions() {
                 writeToOutput(submissions.join("\n"));
                 getGallerySubmissions();
             } else { //bad request, try again.
-                setStatus("Failed to get page "+pageNum+" trying again in 5 seconds.");
+                setStatus("Failed to get page " + pageNum + " trying again in 5 seconds.");
                 window.setTimeout(getGallerySubmissions(), 5000);
             }
         });
@@ -296,9 +299,9 @@ function scrapeGallery() {
 // initiates the download menu
 function downloadMenu() {
     masterDiv = document.createElement("div"); //div master race
-    masterDiv.setAttribute("id","Master");
+    masterDiv.setAttribute("id", "Master");
     var style = document.createElement("style");
-    style.setAttribute("scoped","");
+    style.setAttribute("scoped", "");
     var subjects = [ //masterDiv's 'loyal' subjects
         '<div id="title">Download Gallery <div id="close">✕</div></div>',
         '<div class="divide"></div>',
@@ -404,12 +407,12 @@ function downloadMenu() {
         log(downloadPages[1]);
     });
     //disable other inputs and prepare downloader to incrementally grab pages until end of gallery
-    allPages.addEventListener("click", function(){
+    allPages.addEventListener("click", function() {
         var bool = allPages.checked;
         if (bool === true) {
             pageStart.setAttribute("disabled", "");
             pageEnd.setAttribute("disabled", "");
-            downloadPages = [1,99999]; //will stop when end of gallery is found.
+            downloadPages = [1, 99999]; //will stop when end of gallery is found.
             downloadAll = true;
         } else {
             pageStart.removeAttribute("disabled");
@@ -453,7 +456,7 @@ function downloadMenu() {
 }
 
 function insertButton() {
-    var insertAt = document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab') [0];
+    var insertAt = document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab')[0];
 
     var button = document.createElement("input");
     button.type = "button";
