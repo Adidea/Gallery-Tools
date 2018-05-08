@@ -14,6 +14,14 @@
 // @grant       none
 // ==/UserScript==
 
+
+/* TODO:
+	- Rewrite paging
+	- update targets for metadata
+	- implement pause/stop
+	- scrape new content option
+*/
+
 /* Options for keeping track of submissions last scraped.
 	1.Find the last page and store page number and last submission in gallery.
 		- on subsequent scrapes go to page number and incrementally
@@ -62,35 +70,32 @@ var gallery = {
 gallery.page = {
 	number: 0,
 	getLinks: function(page) {
-		var thumbnails = page.getElementsByClassName("t-image");
+		var pageHtml = currentPage.documentElement.innerHTML;
+		var regExDownloadLink = /<a href="(\/view\/(.+?)\/)">/g;
+		var submissionLinks;
 		var links = [];
-		for (var i = 0; i < thumbnails.length; i++) {
-			var link = thumbnails[i].getElementsByTagName("a")[0];
-			if (link !== undefined && link.href !== undefined) {
-				links.push(link.href);
-			}
+		while ((submissionLinks = regExDownloadLink.exec(pageHtml)) !== null) {
+			links.push(submissionLinks[1]);
 		}
 		return links;
 	},
 	isLast: function(page) {
-		var noImages = page.getElementById("no-images");
+		var noImages = document.querySelector(".pagination .button.right.inactive");
 		if (noImages === null) {
 			return false;
 		} else {
 			return true;
 		}
+	},
+	baseURL : function(url) { //returns [base url (no page number), gallery type (gallery, favorites, scraps)]
+		return url.match("https?:\/\/www\.furaffinity\.net\/(gallery|favorites|scraps)\/[^\/]+\/");
 	}
 }
 
 gallery.submission = {
 	getSource: function(submission) {
-		var controlBar = submission.getElementsByClassName("button submission");
-		for (var i = 0; i < controlBar.length; i++) {
-			var link = controlBar[i].getElementsByTagName("a")[0];
-			if (link !== undefined && link.textContent == "Download") {
-				return link.href;
-			}
-		}
+		var download = submission.querySelector(".download-logged-in");
+		return download.href;
 	},
 	getTags: function(submission) {
 		var tags = [];
@@ -301,26 +306,33 @@ var ui = {
 }
 
 //NOTE: retry failed requests
-gallery.scrapeGallery = function(pageNum) {
-	if (pageNum <= settings.pages[1]) {
-		download.menu.setStatus("Scraping page: " + "/" + (settings.downloadAll ? "?" : settings.pages[1]));
-		download.menu.setProgress(pageNum, settings.pages[0], settings.pages[1]);
-		download.menu.writeToOutput(gallery.links.join("\n"));
+//split logic for gallery/scraps and favorites. Page navigation differs too much. Still need to present consistent scraping options though.
+gallery.scrape = {
+	fromStart : function(currentPage) {
 
-		gallery.page.number = pageNum;
-		var galleryPage = gallery.url.match("https?:\/\/www\.furaffinity\.net\/(gallery|favorites|scraps)\/[^\/]+\/");
-		request.get(galleryPage + pageNum, function(page) {
-			if (gallery.page.isLast(page) === false) {
-				var submissionLinks = gallery.page.getLinks(page);
-				gallery.links = gallery.links.concat(submissionLinks);
-				gallery.scrapeGallery(pageNum + 1);
-			} else {
-				gallery.scrapeGallery(settings.pages[1] + 1); //kind of a roundabout hack to move onto next stage when downloading all pages... tired.
-			}
-		})
-	} else { //stage 2 - scrape submissions
-		gallery.scrapeSubmission(gallery.links, 0);
+	},
+	pageRange : function(pageNum) {
+		if (pageNum <= settings.pages[1]) {
+			download.menu.setStatus("Scraping page: " + "/" + (settings.downloadAll ? "?" : settings.pages[1]));
+			download.menu.setProgress(pageNum, settings.pages[0], settings.pages[1]);
+			download.menu.writeToOutput(gallery.links.join("\n"));
+	
+			gallery.page.number = pageNum;
+			var galleryPage = gallery.page.baseURL(gallery.url)[0];
+			request.get(galleryPage + pageNum, function(page) {
+				if (gallery.page.isLast(page) === false) {
+					var submissionLinks = gallery.page.getLinks(page);
+					gallery.links = gallery.links.concat(submissionLinks);
+					gallery.pageRange(pageNum + 1);
+				} else {
+					gallery.pageRange(settings.pages[1] + 1); //kind of a roundabout hack to move onto next stage when downloading all pages... tired.
+				}
+			})
+		} else { //stage 2 - scrape submissions
+			gallery.scrapeSubmission(gallery.links, 0);
+		}
 	}
+
 }
 
 gallery.scrapeSubmission = function(submissions, num) {
@@ -329,7 +341,7 @@ gallery.scrapeSubmission = function(submissions, num) {
 		download.menu.setProgress(num, 0, gallery.links.length);
 
 		var source = gallery.submission.getSource(page);
-		if (settings.downloadMetadata) {
+		if (settings.downloadMetadata === true) {
 			var tags = gallery.submission.getTags(page);
 			var fileName = source.match(/[^\/]+$/)[0];
 			var data = {
@@ -358,7 +370,7 @@ gallery.scrapeSubmission = function(submissions, num) {
 	})
 }
 
-var download = {
+var download = { //more like scraper controls?
 	state: "stopped", //possible states: stopped, running, paused
 	menu: null,
 	start: function() {
@@ -378,13 +390,22 @@ var download = {
 }
 
 function initialize() {
-	var insertAt = document.getElementsByClassName("userpage-tabs")[0] || document.getElementsByClassName("bg2")[0];
+	var insertAt = document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab')[0];
 
 	//insert download button on gallery pages
 	var button = document.createElement("input");
 	button.type = "button";
-	button.style.float = "right";
 	button.value = "Download Gallery";
+	var buttonCSS = [
+        "height: 100%;",
+        "background: none;",
+        "font-size: inherit;",
+        "border: none;",
+        "color: inherit;",
+        "font-family: inherit;",
+        "padding: 0 15px;"
+    ];
+    button.setAttribute("style", buttonCSS.join(""));
 	insertAt.appendChild(button);
 
 	button.addEventListener("click", function() {
