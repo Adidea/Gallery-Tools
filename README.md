@@ -5,6 +5,8 @@ Tools for scraping image galleries - specifically Furaffinity at this time
 ## Scraper
 Written in javascript to be run as a user script. May eventually be ported to an extension or electron app. Scrapes select gallery pages retrieving submission image urls and optionally related metadata in a json format.
 
+V2 is the rewrite and doesn't currently function, but hopefully will soon. It won't actually look or function much differently from v1, but will be much easier to maintain and update.
+
 ## Scripts
 A random assortment of scripts written in javascript and Lua used for processing metadata in different ways. I wouldn't consider much of it useful to most. 
 
