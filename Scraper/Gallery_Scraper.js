@@ -8,8 +8,10 @@
 // @include     http://www.furaffinity.net/favorites/*
 // @include     http://www.furaffinity.net/scraps/*
 // @include     http://www.furaffinity.net/gallery/*
+// @include     https://www.furaffinity.net/controls/favorites/
+// @include     http://www.furaffinity.net/controls/favorites/
 // @run-at      document-end
-// @version     1.3.9
+// @version     1.3.10
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -19,6 +21,7 @@ to do:
 - handle bad requests - done, largely untested.
 - look into saving images to disk - doesn't look to be very do-able without making an extension.
 - add a pause/resume button (easy enough)
+- rewrite this dumpster fire - in progress.
 */
 
 var sources = null;
@@ -66,7 +69,7 @@ function setStatus(str) {
 }
 
 function setProgress(percent) {
-    var statsFill = masterDiv.querySelector("#statusFill");
+    var statusFill = masterDiv.querySelector("#statusFill");
     statusFill.style.width = (100 * percent) + "%";
 }
 
@@ -108,14 +111,14 @@ function getSubmissionSource(page) {
 function getTagsFromSubmission(page) {
     var tags = [];
     var tagEl = page.getElementsByClassName("tags");
-    for (i = 0; i < tagEl.length; i++) {
+    for (var i = 0; i < tagEl.length; i++) {
         tags[i] = tagEl[i].firstChild.textContent;
     }
     //also collect category, species, and gender info
     var categoryTagEl = page.getElementsByClassName("sidebar-section-no-bottom")[0]; //if this changes again... (ノಠ益ಠ)ノ彡┻━┻
     var categoryTagsList = categoryTagEl.getElementsByTagName("strong");
     var category = [];
-    for (i = 0; i < categoryTagsList.length; i++) {
+    for (var i = 0; i < categoryTagsList.length; i++) {
         var categoryTitle = categoryTagsList[i].textContent;
         var categoryTag = categoryTagsList[i].nextSibling.textContent;
         category[i] = categoryTitle + categoryTag.replace("|", "");
@@ -145,6 +148,16 @@ function downloadComplete() {
     }
 }
 
+function getDescription(title) {
+    var description = [];
+    var text = title.nextSibling
+    while (text != null) {
+        description.push(text.textContent);
+        text = text.nextSibling
+    }
+    return description.join("");
+}
+
 //requests submission pages and adds submission url to collector array
 function fetchPage(submissions, num, collector) {
     //mysterious undefined variable being appended to the end of the array
@@ -168,7 +181,7 @@ function fetchPage(submissions, num, collector) {
                     var tags = getTagsFromSubmission(page);
                     var fileName = decodeURIComponent(source.match(/[^\/]+$/)[0]);
                     var title = page.getElementsByClassName("submission-title")[0];
-                    var description = title.nextSibling.textContent;
+                    var description = getDescription(title);
                     source = {
                         image: decodeURIComponent(source),
                         submission: submissions[num], //could provide id or url. using url for now.
@@ -200,7 +213,7 @@ function fetchPage(submissions, num, collector) {
                 }
             } else { //bad request, add to fail list D:
                 setStatus("Request Failed: " + submissions[num]);
-                failed[(failed.length - 1) + 1] = submissions[num];
+                failed.push(submissions[num]);
                 if (num < submissions.length) { //ugly patch
                     fetchPage(submissions, ++num, collector);
                 }
@@ -262,7 +275,7 @@ function getGallerySubmissions() {
                 writeToOutput(submissions.join("\n"));
                 getGallerySubmissions();
             } else { //bad request, try again.
-                setStatus("Failed to get page " + pageNum + " trying again in 5 seconds.");
+                setStatus("Failed to get page (" + xhr.status + ") " + pageNum + " trying again in 5 seconds.");
                 window.setTimeout(getGallerySubmissions(), 5000);
             }
         });
@@ -456,7 +469,7 @@ function downloadMenu() {
 }
 
 function insertButton() {
-    var insertAt = document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab')[0];
+    var insertAt = document.getElementsByClassName("section-header")[0] || document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab')[0];
 
     var button = document.createElement("input");
     button.type = "button";
