@@ -1,17 +1,12 @@
 // ==UserScript==
-// @name        FA Gallery Scraper
+// @name        FA Gallery Scraper - temp fix
 // @namespace   Artex
 // @description Retrieves the sources to the submissions in a gallery
-// @include     https://www.furaffinity.net/favorites/*
-// @include     https://www.furaffinity.net/scraps/*
-// @include     https://www.furaffinity.net/gallery/*
-// @include     http://www.furaffinity.net/favorites/*
-// @include     http://www.furaffinity.net/scraps/*
-// @include     http://www.furaffinity.net/gallery/*
-// @include     https://www.furaffinity.net/controls/favorites/
-// @include     http://www.furaffinity.net/controls/favorites/
+// @include     https://www.furaffinity.net/controls/favorites/*
+// @include     http://www.furaffinity.net/controls/favorites/*
+// @include     https://www.furaffinity.net/controls/submissions/*
 // @run-at      document-end
-// @version     1.3.10
+// @version     1.4.0
 // @homepage     https://www.furaffinity.net/user/artex./
 // @grant       none
 // ==/UserScript==
@@ -24,6 +19,7 @@ to do:
 - rewrite this dumpster fire - in progress.
 */
 
+var throttleTime = 500
 var sources = null;
 var submissions = [];
 var failed = [];
@@ -96,7 +92,7 @@ function getSubmissions() {
 //retrieves the submission image url from the submission page document.
 function getSubmissionSource(page) {
     var source = null;
-    var downloadButton = page.getElementsByClassName("download-logged-in")[0];
+    var downloadButton = page.querySelector(".download a");
     if (downloadButton) { //beta
         source = downloadButton.href;
     } else { //clasic
@@ -105,28 +101,27 @@ function getSubmissionSource(page) {
         source = 'http:' + pageHtml.match(regExDownloadLink)[1];
     }
     return source;
-
 }
 
 function getTagsFromSubmission(page) {
     var tags = [];
-    var tagEl = page.getElementsByClassName("tags");
-    for (var i = 0; i < tagEl.length; i++) {
-        tags[i] = tagEl[i].firstChild.textContent;
+    var tagEl = page.querySelectorAll(".tags-row .tags a");
+    for (let tag of tagEl) {
+        tags.push(tag.textContent);
     }
     //also collect category, species, and gender info
-    var categoryTagEl = page.getElementsByClassName("sidebar-section-no-bottom")[0]; //if this changes again... (ノಠ益ಠ)ノ彡┻━┻
+    var categoryTagEl = page.getElementsByClassName("info")[0]; //if this changes again... (ノಠ益ಠ)ノ彡┻━┻
     var categoryTagsList = categoryTagEl.getElementsByTagName("strong");
-    var category = [];
-    for (var i = 0; i < categoryTagsList.length; i++) {
-        var categoryTitle = categoryTagsList[i].textContent;
-        var categoryTag = categoryTagsList[i].nextSibling.textContent;
-        category[i] = categoryTitle + categoryTag.replace("|", "");
+    var categories = [];
+    for (let category of categoryTagsList) {
+        var categoryTitle = category.textContent;
+        var categoryTag = category.nextElementSibling.textContent;
+        categories.push(categoryTitle + ": " + categoryTag);
     }
     //get rating
     var rating = "Rating: " + page.getElementsByClassName("rating-box")[0].textContent.replace("\n", "");
-    category.push(rating);
-    return [tags, category];
+    categories.push(rating);
+    return [tags, categories];
 }
 
 function retryFailed() {
@@ -148,14 +143,38 @@ function downloadComplete() {
     }
 }
 
-function getDescription(title) {
-    var description = [];
-    var text = title.nextSibling
-    while (text != null) {
-        description.push(text.textContent);
-        text = text.nextSibling
+function parseUsernames(description) {
+    let descriptionUsernames = description.querySelectorAll(".iconusername");
+    if (descriptionUsernames) {
+        for (let username of descriptionUsernames) {
+            let url = username.href;
+            let name = url.match(/\/user\/(.+$)/)[1];
+            username.textContent = name + "(" + url + ") "
+        }
     }
-    return description.join("");
+}
+
+function parseLinks(description) {
+    let shortLinks = description.querySelectorAll(".auto_link_shortened");
+    if (shortLinks) {
+        for (let link of shortLinks) {
+            link.textContent = link.href;
+        }
+    }
+    let namedLinks = description.querySelectorAll(".named_url");
+    if (namedLinks) {
+        for (let link of namedLinks) {
+            link.textContent = link.textContent + "(" + link.href + ")";
+        }
+    }
+
+}
+
+function getDescription(page) {
+    let description = page.querySelector(".submission-description");
+    parseUsernames(description);
+    parseLinks(description);
+    return description.textContent.replace("^\n", " ");
 }
 
 //requests submission pages and adds submission url to collector array
@@ -166,7 +185,7 @@ function fetchPage(submissions, num, collector) {
     if (submissions[num] !== undefined) {
         var xhr = new XMLHttpRequest();
 
-        xhr.addEventListener("loadend", function() {
+        xhr.addEventListener("loadend", function () {
             if (startMode === true) {
                 setStatus("Cancelled");
                 if (downloadMetadata) {
@@ -181,7 +200,7 @@ function fetchPage(submissions, num, collector) {
                     var tags = getTagsFromSubmission(page);
                     var fileName = decodeURIComponent(source.match(/[^\/]+$/)[0]);
                     var title = page.getElementsByClassName("submission-title")[0];
-                    var description = getDescription(title);
+                    var description = getDescription(page);
                     source = {
                         image: decodeURIComponent(source),
                         submission: submissions[num], //could provide id or url. using url for now.
@@ -189,7 +208,7 @@ function fetchPage(submissions, num, collector) {
                         category: tags[1],
                         artist: source.match(/art\/([^\/]+)\//)[1],
                         description: description ? description : "",
-                        title: title.getElementsByClassName("submission-title-header")[0].innerText
+                        title: title.firstElementChild.textContent
                     };
                     log(fileName);
                     collector[fileName] = source;
@@ -203,7 +222,9 @@ function fetchPage(submissions, num, collector) {
                 var end = false;
                 if (num < submissions.length) {
                     end = true;
-                    fetchPage(submissions, ++num, collector);
+                    setTimeout(function () {
+                        fetchPage(submissions, ++num, collector);
+                    }, throttleTime); //slow mode to avoid getting 503s?
                 }
 
                 if (downloadMetadata) {
@@ -215,7 +236,9 @@ function fetchPage(submissions, num, collector) {
                 setStatus("Request Failed: " + submissions[num]);
                 failed.push(submissions[num]);
                 if (num < submissions.length) { //ugly patch
-                    fetchPage(submissions, ++num, collector);
+                    setTimeout(function () {
+                        fetchPage(submissions, ++num, collector);
+                    }, 1500);
                 }
             }
             if ((num + 1) >= submissions.length) {
@@ -261,7 +284,7 @@ function getGallerySubmissions() {
             setProgress(pageNum / downloadPages[1]);
         }
         var xhr = new XMLHttpRequest();
-        xhr.addEventListener("loadend", function() {
+        xhr.addEventListener("loadend", function () {
             if (xhr.status === 200) { //Ok
                 currentPage = this.responseXML;
                 //got all submission links, start getting sources
@@ -405,22 +428,22 @@ function downloadMenu() {
     var metadataButton = masterDiv.querySelector("#metadata");
     var start = masterDiv.querySelector("#start");
 
-    closeWindow.addEventListener("click", function() {
+    closeWindow.addEventListener("click", function () {
         document.body.removeChild(masterDiv);
         resetGlobals();
         masterDiv = null;
     });
     //update downloadPages
-    pageStart.addEventListener("input", function() {
+    pageStart.addEventListener("input", function () {
         downloadPages[0] = pageStart.value;
         pageNum = downloadPages[0];
     });
-    pageEnd.addEventListener("input", function() {
+    pageEnd.addEventListener("input", function () {
         downloadPages[1] = pageEnd.value;
         log(downloadPages[1]);
     });
     //disable other inputs and prepare downloader to incrementally grab pages until end of gallery
-    allPages.addEventListener("click", function() {
+    allPages.addEventListener("click", function () {
         var bool = allPages.checked;
         if (bool === true) {
             pageStart.setAttribute("disabled", "");
@@ -436,11 +459,11 @@ function downloadMenu() {
     });
 
     //Get tags, submission page, and submission file in JSON format.
-    metadataButton.addEventListener("click", function() {
+    metadataButton.addEventListener("click", function () {
         downloadMetadata = metadataButton.checked;
     });
 
-    start.addEventListener("click", function() {
+    start.addEventListener("click", function () {
         if (startMode === true) { //start download
             var statusDiv = masterDiv.querySelector("#status");
             if (statusDiv === null) {
@@ -469,7 +492,7 @@ function downloadMenu() {
 }
 
 function insertButton() {
-    var insertAt = document.getElementsByClassName("section-header")[0] || document.getElementsByClassName("user-profile-options")[0] || document.getElementsByClassName('tab')[0];
+    var insertAt = document.getElementsByClassName("section-header")[0];
 
     var button = document.createElement("input");
     button.type = "button";
@@ -487,7 +510,7 @@ function insertButton() {
     log(insertAt);
     insertAt.appendChild(button);
 
-    button.addEventListener("click", function() {
+    button.addEventListener("click", function () {
         if (menuOpen === false) {
             downloadMenu();
             menuOpen = true;
